@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EP-TAXEN – Budget & Controlling V6</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--text:#17202a;--muted:#667085;--border:#d9dee5;--accent:#17365d;--green:#17803d;--yellow:#b77900;--red:#c62828}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
+.wrap{max-width:1180px;margin:auto;padding:16px}.head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:24px;margin:8px 0}h2{font-size:18px}h3{font-size:16px}.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.kpi{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px}.kpi b{font-size:22px;display:block;margin-top:5px}
+label{display:block;font-size:13px;font-weight:700}input,select,textarea,button{font:inherit;min-height:44px;border-radius:9px;border:1px solid var(--border);padding:9px;background:white}input,select,textarea{width:100%}textarea{min-height:70px}
+button{cursor:pointer;font-weight:700}.primary{background:var(--accent);color:#fff}.danger{color:var(--red)}.tabs,.filters{display:flex;gap:7px;flex-wrap:wrap}.tab.active,.filter.active{background:var(--accent);color:#fff}
+.form{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.wide{grid-column:1/-1}.hidden{display:none!important}
+.right{text-align:right}.green{color:var(--green)}.yellow{color:var(--yellow)}.red{color:var(--red)}.muted{color:var(--muted);font-size:13px}
+.progress{height:8px;background:#e6e9ed;border-radius:99px;overflow:hidden}.progress span{display:block;height:100%;background:#64748b}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:center;border-top:1px solid var(--border);padding:10px 0}.row:first-child{border-top:0}
+.catcard{border:1px solid var(--border);border-radius:12px;padding:12px;margin:9px 0;cursor:pointer;background:#fff}.catcard:hover{border-color:#8aa0b8}
+.pills{display:flex;gap:8px;flex-wrap:wrap}.pill{padding:5px 8px;border-radius:99px;background:#eef2f6;font-size:12px}
+.actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.notice{padding:10px;border-radius:10px;background:#f8fafc;border:1px solid var(--border)}
+@media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.form{grid-template-columns:1fr}.row{align-items:flex-start}.right{min-width:120px}h1{font-size:20px}}
+</style>
+</head>
+<body><main class="wrap">
+<div class="head"><div><h1>🚕 EP-TAXEN – Budget & Controlling V6</h1><div class="muted">Budget · wiederkehrende Kosten · Auswertung · Gewinnkontrolle · lokale Datenspeicherung</div></div>
+<label>Geschäftsjahr<select id="year"><option>2027</option><option>2028</option><option>2029</option><option>2030</option><option>2031</option><option>2032</option></select></label></div>
+
+<section class="grid">
+<div class="kpi">Einnahmen<b id="kIncome">0 €</b><span class="green">● laufender Stand</span></div>
+<div class="kpi">Ausgaben<b id="kExpense">0 €</b><span id="expenseSignal"></span></div>
+<div class="kpi">Gewinn bisher<b id="kProfit">0 €</b><span class="muted">Einnahmen − Ausgaben</span></div>
+<div class="kpi">Prognose 31.12.<b id="kForecast">0 €</b><span id="limitSignal"></span></div>
+</section>
+
+<section class="card form">
+<label>Gewinn-Obergrenze<input id="limit" type="number" min="0" step="100" value="30000"></label>
+<label>Gültig ab<input id="validFrom" type="date" value="2028-01-01"></label>
+<div><div class="muted">Reserve bis Obergrenze</div><b id="reserve" style="font-size:22px">0 €</b></div>
+</section>
+
+<nav class="tabs">
+<button class="tab active" data-tab="overview">Übersicht</button>
+<button class="tab" data-tab="income">Einnahmen</button>
+<button class="tab" data-tab="expenses">Ausgaben</button>
+<button class="tab" data-tab="recurring">🔁 Wiederkehrend</button>
+<button class="tab" data-tab="analysis">📊 Auswertung</button>
+<button class="tab" data-tab="budgets">Budgets</button>
+<button class="tab" data-tab="data">💾 Daten</button>
+</nav>
+
+<section id="overview" class="panel">
+<div class="card"><h2>Handlungsbedarf</h2><div id="actionSummary"></div></div>
+<div class="card"><h2>Ausgaben nach Obergruppen</h2><div id="budgetRows"></div></div>
+<div class="card"><h2>Offene Posten</h2><div id="openSummary"></div></div>
+</section>
+
+<section id="income" class="panel hidden">
+<form id="incomeForm" class="card form">
+<label>Datum<input id="inDate" type="date" required></label>
+<label>Auftraggeber / Vorlage<input id="inCustomer" list="customerList" placeholder="optional"><datalist id="customerList"></datalist></label>
+<label>Bereich<select id="inCat"><option>Taxifahrten</option><option>Kranken-/Rechnungsfahrten</option><option>Sonstige Rechnungsfahrten</option><option>Sonstige Einnahmen</option></select></label>
+<label>Betrag €<input id="inAmount" type="number" min="0" step=".01" required></label>
+<label class="wide">Notiz<textarea id="inNote" placeholder="optional"></textarea></label>
+<div class="wide"><button id="incomeSave" class="primary">+ Einnahme speichern</button> <button id="incomeCancel" type="button" class="hidden">Bearbeiten abbrechen</button></div>
+</form>
+<div class="card"><h2>Einnahmen-Buchungen – <span id="incomeYearLabel"></span></h2><div id="incomeList"></div></div>
+</section>
+
+<section id="expenses" class="panel hidden">
+<form id="expenseForm" class="card form">
+<label>Datum *<input id="exDate" type="date" required></label>
+<label>Lieferant / Beschreibung *<input id="exDesc" list="supplierList" required><datalist id="supplierList"></datalist></label>
+<label>Rechnungs-/Belegnummer<input id="exInvoice"></label>
+<label>Kostenbereich *<select id="exCat"></select></label><label>SKR03-Konto<select id="exSkr"></select></label>
+<label>Planbetrag €<input id="exPlan" type="number" min="0" step=".01" placeholder="optional"></label>
+<label>Tatsächlicher Betrag € *<input id="exAmount" type="number" min="0" step=".01" required></label>
+<label>Fälligkeit<input id="exDue" type="date"></label>
+<label>Status<select id="exStatus"><option value="planned">Geplant</option><option value="open">Offen</option><option value="paid">Bezahlt</option></select></label>
+<label>Zahlungsart<select id="exPay"><option>Bank</option><option>Karte</option><option>Bar</option><option>Sonstige</option></select></label>
+<label style="display:flex;align-items:center;gap:8px;margin-top:22px"><input id="exOne" type="checkbox" style="width:auto"> Einmalige/Sonderausgabe</label>
+<label style="display:flex;align-items:center;gap:8px;margin-top:22px"><input id="exRecurring" type="checkbox" style="width:auto"> Als wiederkehrende Ausgabe speichern</label>
+<label id="rhythmWrap" class="hidden">Rhythmus<select id="exRhythm"><option value="monthly">monatlich</option><option value="quarterly">vierteljährlich</option><option value="halfyearly">halbjährlich</option><option value="yearly">jährlich</option><option value="custom">benutzerdefiniert</option></select></label>
+<label id="validFromWrap" class="hidden">Gültig von<input id="exValidFrom" type="date"></label>
+<label id="validToWrap" class="hidden">Gültig bis<input id="exValidTo" type="date"></label>
+<label id="amountModeWrap" class="hidden">Betragsart<select id="exAmountMode"><option value="installment">Betrag je Fälligkeit</option><option value="periodTotal">Gesamtbetrag für Zeitraum</option></select></label>
+<label id="customDatesWrap" class="hidden wide">Individuelle Fälligkeitstermine (TT.MM.JJJJ, durch Komma getrennt)<input id="exCustomDates" placeholder="z. B. 15.02.2027, 15.05.2027, 15.08.2027"></label>
+<label class="wide">Notiz<textarea id="exNote" placeholder="optional"></textarea></label>
+<div class="wide"><button id="expenseSave" class="primary">Speichern</button> <button type="button" id="clear">Leeren</button> <button type="button" id="expenseCancel" class="hidden">Bearbeiten abbrechen</button><div id="dup" class="red hidden">⚠️ Diese Rechnungsnummer wurde bereits erfasst.</div></div>
+</form>
+<div class="filters"><button class="filter active" data-filter="20">Letzte 20</button><button class="filter" data-filter="planned">Geplant</button><button class="filter" data-filter="open">Offen</button><button class="filter" data-filter="due">Fällig</button><button class="filter" data-filter="overdue">Überfällig</button><button class="filter" data-filter="paid">Bezahlt</button><button class="filter" data-filter="all">Alle</button></div>
+<div class="card"><h2>Ausgaben-Buchungen – <span id="expenseYearLabel"></span></h2><label>Suche / Rechnungsnummer<input id="search"></label><div id="expenseList" style="margin-top:12px"></div></div>
+</section>
+
+<section id="recurring" class="panel hidden">
+<div id="recEditCard" class="card hidden">
+<h2 id="recEditTitle">Wiederkehrende Ausgabe bearbeiten</h2>
+<form id="recForm" class="form">
+<label>Lieferant / Beschreibung<input id="rDesc" required></label>
+<label>Kostenbereich<select id="rCat"></select></label><label>SKR03-Konto<select id="rSkr"></select></label>
+<label>Zahlungsart<select id="rPay"><option>Bank</option><option>Karte</option><option>Bar</option><option>Sonstige</option></select></label>
+<label>Gültig von<input id="rFrom" type="date" required></label>
+<label>Gültig bis<input id="rTo" type="date" required></label>
+<label>Rhythmus<select id="rRhythm"><option value="monthly">monatlich</option><option value="quarterly">vierteljährlich</option><option value="halfyearly">halbjährlich</option><option value="yearly">jährlich</option><option value="custom">benutzerdefiniert</option></select></label>
+<label>Betragsart<select id="rAmountMode"><option value="installment">Betrag je Fälligkeit</option><option value="periodTotal">Gesamtbetrag für Zeitraum</option></select></label>
+<label>Betrag €<input id="rAmount" type="number" min="0" step=".01" required></label>
+<label>Erste Fälligkeit<input id="rFirstDue" type="date" required></label>
+<label id="rCustomWrap" class="wide hidden">Individuelle Termine<input id="rCustom" placeholder="TT.MM.JJJJ, TT.MM.JJJJ"></label>
+<label class="wide">Notiz<textarea id="rNote"></textarea></label>
+<div class="wide"><button class="primary">Speichern</button> <button type="button" id="rCancel">Abbrechen</button></div>
+</form></div>
+<div class="card"><h2>Wiederkehrende Ausgaben</h2><p class="muted">Vorlagen mit Gültigkeitszeitraum. „Neue Periode“ übernimmt die Vorlage, damit z. B. ein neuer Versicherungsbetrag ab dem Folgejahr sauber getrennt bleibt.</p><div id="recurringList"></div></div>
+<div class="card"><h2>Gespeicherte Lieferanten & Auftraggeber</h2><p class="muted">Die App merkt sich deine Zuordnungen und schlägt sie später wieder vor.</p><div id="templateList"></div></div>
+</section>
+
+<section id="analysis" class="panel hidden">
+<div class="card"><h2>Auswertung nach Themenbereich – <span id="analysisYear"></span></h2><div class="filters">
+<label>Zeitraum<select id="anaPeriod"><option value="year">Jahr</option><option value="q1">1. Quartal</option><option value="q2">2. Quartal</option><option value="q3">3. Quartal</option><option value="q4">4. Quartal</option><option value="month">Monat</option><option value="custom">von–bis</option></select></label>
+<label id="anaMonthWrap" class="hidden">Monat<select id="anaMonth"></select></label>
+<label id="anaFromWrap" class="hidden">Von<input id="anaFrom" type="date"></label>
+<label id="anaToWrap" class="hidden">Bis<input id="anaTo" type="date"></label>
+</div><div id="analysisCats"></div></div>
+<div id="analysisDetail" class="card hidden"></div>
+</section>
+
+<section id="budgets" class="panel hidden"><div class="card"><h2>Jahresbudgets bearbeiten</h2><p class="muted">Änderungen wirken sofort auf die Ampeln.</p><div id="budgetInputs" class="form"></div></div></section>
+
+<section id="data" class="panel hidden">
+<div class="card"><h2>Datensicherung</h2><p>Hier kannst du sämtliche Buchungen, Budgets, wiederkehrenden Vorlagen und Lernzuordnungen sichern.</p>
+<div class="actions" style="justify-content:flex-start"><button id="exportBtn" class="primary">Datensicherung erstellen</button><label style="display:inline-block"><span style="display:inline-block;padding:12px;border:1px solid var(--border);border-radius:9px;cursor:pointer">Datensicherung einlesen</span><input id="importFile" type="file" accept=".json,application/json" class="hidden"></label></div>
+<p class="muted">Wichtig: Die lokale Browserspeicherung allein ist keine dauerhafte Datensicherung. Exportiere regelmäßig eine Sicherungsdatei.</p></div>
+</section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const euro=n=>new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(Number(n)||0);
+const STORE='eptax_budget_v6', OLDSTORE='eptax_budget_v5';
+const defaultCats={'Fahrzeug & Energie':14000,'Fahrzeugversicherung':3500,'Personal':8000,'BG / Arbeitsschutz':1000,'Taxizentrale & Vermittlung':8000,'Büro & Raum':3000,'Telefon / Daten / Software':1800,'Buchhaltung & Beratung':2500,'Gebühren & Beiträge':1200,'Bank & Zahlungsverkehr':1200,'Werbung & Kundenpflege':1500,'Betriebsausstattung':1000,'Abschreibungen (AfA)':7000,'Sonstige Betriebskosten':1300};
+const skr03=[
+['4125','Minijob Ehefrau'],['4130','Abgaben'],['4138','BG Abgaben'],['4210','Miete'],['4360','Versicherungen'],
+['4510','Kfz-Steuer'],['4520','Kfz-Versicherung'],['4530','Treibstoffe Diesel/Strom'],['4540','KFZ-Reparaturen / Wartung / Reifen'],['4590','Fahrzeugpflege'],
+['4600','Werbemittel'],['4650','Bewirtungskosten'],['4832','Abschreibung PKW'],['4900','Sonstige betriebliche Aufwendungen'],['4905','Büromaterial'],
+['4920','Telefon & Datenvertrag'],['4940','Fachliteratur'],['4945','Fortbildung'],['4950','Rechts- & Beratungskosten'],['4955','Steuerberatung / Buchführung'],
+['4960','Mitgliedsbeiträge Taxizentrale'],['4961','IHK-Beiträge'],['4970','Bankgebühren'],['4980','Software / Lizenzen'],['4985','Arbeitskleidung'],['6990','nicht abzugsfähige Strafzettel, Bewirtung über 70%']
+];
+const skrByCat={
+'Fahrzeug & Energie':['4510','4530','4540','4590'],
+'Fahrzeugversicherung':['4520'],
+'Personal':['4125','4130'],
+'BG / Arbeitsschutz':['4138','4985'],
+'Taxizentrale & Vermittlung':['4960'],
+'Büro & Raum':['4210','4905'],
+'Telefon / Daten / Software':['4920','4980'],
+'Buchhaltung & Beratung':['4950','4955'],
+'Gebühren & Beiträge':['4961','4940','4945'],
+'Bank & Zahlungsverkehr':['4970'],
+'Werbung & Kundenpflege':['4600','4650'],
+'Betriebsausstattung':['4905','4900'],
+'Abschreibungen (AfA)':['4832'],
+'Sonstige Betriebskosten':['4360','4900','6990']
+};
+const skrKeyword=[
+[/kfz.*vers|taxi.*vers|haftpflicht|kasko/i,'4520'],[/kfz.*steuer/i,'4510'],
+[/diesel|strom|laden|treibstoff/i,'4530'],[/reif|werkstatt|reparatur|wartung|inspektion/i,'4540'],[/wäsche|waschen|fahrzeugpflege/i,'4590'],
+[/funk|lft|taxizentrale|mitgliedsbeitrag.*zentrale|vs-?box/i,'4960'],[/sumup|bankgeb|ec-?geb|kartengeb/i,'4970'],
+[/lexware|software|lizenz|taxi\.eu/i,'4980'],[/telefon|datenvertrag|mobilfunk|sim/i,'4920'],[/steuerberater|buchführung/i,'4955'],[/rechts|beratung/i,'4950'],
+[/miete|arbeitszimmer/i,'4210'],[/büromaterial|druckerpatrone|ordner/i,'4905'],[/werbung|werbemittel|flyer|visitenkarte/i,'4600'],[/bewirt/i,'4650'],
+[/ihk/i,'4961'],[/fortbildung|seminar/i,'4945'],[/fachliteratur|zeitschrift|buch/i,'4940'],[/arbeitskleidung|firmenkleidung/i,'4985'],
+[/bg/i,'4138'],[/minijob|lohn/i,'4125'],[/abgaben/i,'4130'],[/afa|abschreibung/i,'4832']
+];
+
+let saved={}; try{saved=JSON.parse(localStorage.getItem(STORE)||localStorage.getItem(OLDSTORE)||'{}')}catch(e){}
+let cats={...defaultCats,...(saved.budgets||{})};
+let incomes=Array.isArray(saved.incomes)?saved.incomes:[], expenses=Array.isArray(saved.expenses)?saved.expenses:[],
+recurring=Array.isArray(saved.recurring)?saved.recurring:[], suppliers=Array.isArray(saved.suppliers)?saved.suppliers:[],
+customers=Array.isArray(saved.customers)?saved.customers:[], learned= saved.learned&&typeof saved.learned==='object'?saved.learned:{}, learnedSkr=saved.learnedSkr&&typeof saved.learnedSkr==='object'?saved.learnedSkr:{};
+let selectedYear=String(saved.selectedYear||'2027'); if(!$('#year').querySelector(`option[value="${selectedYear}"]`))selectedYear='2027';
+let filter='20', editingIncome=null, editingExpense=null, editingRecurring=null, analysisCat=null;
+$('#year').value=selectedYear; if(saved.limit!=null)$('#limit').value=saved.limit;if(saved.validFrom)$('#validFrom').value=saved.validFrom;
+
+const keywordRules=[
+[/funk|lft|zentrale|vermittlung|vs-?box|seibt|straub/i,'Taxizentrale & Vermittlung'],
+[/kfz.*vers|taxi.*vers|fahrzeug.*vers|vollkasko|teilkasko/i,'Fahrzeugversicherung'],
+[/diesel|benzin|strom|laden|ladesäule|werkstatt|reif|inspektion|wartung|wäsche|fahrzeugpflege|tüv|dekra/i,'Fahrzeug & Energie'],
+[/sumup|kartengeb|bankgeb|kontoführ/i,'Bank & Zahlungsverkehr'],
+[/lexware|software|telefon|mobilfunk|sim|datenfunk|domain|strato/i,'Telefon / Daten / Software'],
+[/steuerberater|lubeca|buchhaltung|beratung/i,'Buchhaltung & Beratung'],
+[/bg verkehr|arbeitsschutz/i,'BG / Arbeitsschutz'],
+[/lohn|gehalt|minijob|personal/i,'Personal'],
+[/miete|arbeitszimmer|büro|raum/i,'Büro & Raum'],
+[/ihk|konzession|gewerbeamt|gebühr|beitrag/i,'Gebühren & Beiträge'],
+[/werbung|flyer|visitenkarte|kundenpflege/i,'Werbung & Kundenpflege'],
+[/drucker|halterung|ausstattung|gerät/i,'Betriebsausstattung'],
+[/afa|abschreibung/i,'Abschreibungen (AfA)']
+];
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function isoTodayForYear(){let d=new Date();return `${selectedYear}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function referenceDate(){return isoTodayForYear()}
+function inYear(x){return String(x.date||x.due||'').slice(0,4)===selectedYear}
+function persist(){localStorage.setItem(STORE,JSON.stringify({version:6,incomes,expenses,recurring,suppliers,customers,learned,learnedSkr,selectedYear,limit:$('#limit').value,validFrom:$('#validFrom').value,budgets:cats}))}
+function totals(){let i=incomes.filter(inYear).reduce((s,x)=>s+(+x.amount||0),0),e=expenses.filter(inYear).reduce((s,x)=>s+(+x.amount||0),0);return{i,e,p:i-e}}
+function spent(c){return expenses.filter(x=>inYear(x)&&x.cat===c).reduce((s,x)=>s+(+x.amount||0),0)}
+function sig(v,b){let r=b?v/b:0;return r>1.05?['🔴','red']:r>.9?['🟡','yellow']:['🟢','green']}
+function addMonthsISO(dateStr,months){let d=new Date(dateStr+'T12:00:00'),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+months);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return d.toISOString().slice(0,10)}
+function parseGermanDate(s){let m=s.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:null}
+function rhythmName(r){return({monthly:'monatlich',quarterly:'vierteljährlich',halfyearly:'halbjährlich',yearly:'jährlich',custom:'individuell'})[r]||r}
+function statusName(s){return s==='paid'?'🟢 Bezahlt':s==='open'?'🟡 Offen':'🔵 Geplant'}
+
+function skrLabel(no){let x=skr03.find(a=>a[0]===String(no));return x?`${x[0]} – ${x[1]}`:(no||'')}
+function skrGuess(text,cat){
+ let t=(text||'').trim().toLowerCase(); if(t){
+   let lk=Object.keys(learnedSkr).find(k=>t.includes(k.toLowerCase())); if(lk)return learnedSkr[lk];
+   for(let [re,no] of skrKeyword)if(re.test(t))return no;
+ }
+ let opts=skrByCat[cat]||[];return opts.length===1?opts[0]:''
+}
+function fillSkrSelect(id,cat,current=''){
+ let allowed=skrByCat[cat]||[], all=[...skr03].sort((a,b)=>a[0].localeCompare(b[0]));
+ $(id).innerHTML='<option value="">— bitte wählen —</option>'+all.map(([n,name])=>`<option value="${n}">${n} – ${esc(name)}</option>`).join('');
+ if(current)$(id).value=String(current); else {let g=skrGuess('',cat);if(g)$(id).value=g}
+}
+function categoryGuess(text){
+ let t=(text||'').trim().toLowerCase(); if(!t)return null;
+ let exact=Object.keys(learned).find(k=>t.includes(k.toLowerCase())); if(exact)return learned[exact];
+ let supplier=suppliers.find(x=>t.includes(x.name.toLowerCase())||x.name.toLowerCase().includes(t)); if(supplier)return supplier.cat;
+ for(let [re,cat] of keywordRules)if(re.test(t))return cat; return null
+}
+function rememberSupplier(name,cat,pay){name=(name||'').trim();if(!name)return;let x=suppliers.find(s=>s.name.toLowerCase()===name.toLowerCase());if(x){x.cat=cat;x.pay=pay}else suppliers.push({name,cat,pay});learned[name]=cat}
+function rememberCustomer(name,cat){name=(name||'').trim();if(!name)return;let x=customers.find(s=>s.name.toLowerCase()===name.toLowerCase());if(x)x.cat=cat;else customers.push({name,cat})}
+function recDates(r){
+ let from=r.validFrom||r.firstDue, to=r.validTo||`${String(from||selectedYear).slice(0,4)}-12-31`; if(!from)return[];
+ if(r.rhythm==='custom')return (r.customDates||[]).filter(d=>d>=from&&d<=to);
+ let step={monthly:1,quarterly:3,halfyearly:6,yearly:12}[r.rhythm]||12,d=r.firstDue||from,out=[],guard=0;
+ while(d<from&&guard++<240)d=addMonthsISO(d,step);while(d<=to&&guard++<240){out.push(d);d=addMonthsISO(d,step)}return out
+}
+function recInstallment(r){
+ let dates=recDates(r); if(r.amountMode==='periodTotal'&&dates.length)return (+r.amount||0)/dates.length;return +r.amount||0
+}
+function generateRecurring(){
+ recurring.filter(r=>r.active!==false).forEach(r=>{let amt=recInstallment(r);recDates(r).forEach(d=>{let key=`REC-${r.id}-${d}`;if(!expenses.some(x=>x.recKey===key))expenses.push({date:d,desc:r.desc,invoice:'',cat:r.cat,skr:r.skr||'',planAmount:amt,amount:amt,due:d,status:'planned',pay:r.pay||'Bank',one:false,note:r.note||'',recKey:key,generated:true,recId:r.id})})});persist()
+}
+function fillCatSelects(){['#exCat','#rCat'].forEach(id=>$(id).innerHTML=Object.keys(cats).map(c=>`<option>${esc(c)}</option>`).join(''));fillSkrSelect('#exSkr',$('#exCat').value);fillSkrSelect('#rSkr',$('#rCat').value)}
+function renderTemplates(){
+ $('#supplierList').innerHTML=suppliers.map(s=>`<option value="${esc(s.name)}"></option>`).join('');
+ $('#customerList').innerHTML=customers.map(s=>`<option value="${esc(s.name)}"></option>`).join('');
+ $('#templateList').innerHTML=`<b>Lieferanten:</b> ${suppliers.length?suppliers.map(s=>`${esc(s.name)} → ${esc(s.cat)}`).join(' · '):'noch keine'}<br><br><b>Auftraggeber:</b> ${customers.length?customers.map(s=>esc(s.name)).join(' · '):'noch keine'}<br><br><b>Gelernte SKR03-Zuordnungen:</b> ${Object.keys(learnedSkr).length}`
+}
+function renderRecurring(){
+ $('#recurringList').innerHTML=recurring.length?recurring.map((r,i)=>`<div class="row"><div><b>${esc(r.desc)}</b><div class="muted">${esc(r.cat)} · ${r.skr?esc(skrLabel(r.skr))+' · ':''}${euro(r.amount)} ${r.amountMode==='periodTotal'?'gesamt':'je Fälligkeit'} · ${rhythmName(r.rhythm)}<br>${r.validFrom||'—'} bis ${r.validTo||'—'} · ${r.active===false?'pausiert':'aktiv'}</div></div><div class="actions"><button onclick="editRecurring(${i})">Bearbeiten</button><button onclick="newPeriod(${i})">Neue Periode</button><button onclick="toggleRecurring(${i})">${r.active===false?'Aktivieren':'Pausieren'}</button><button class="danger" onclick="deleteRecurring(${i})">Löschen</button></div></div>`).join(''):'<span class="muted">Noch keine wiederkehrenden Ausgaben.</span>';renderTemplates()
+}
+function expenseStatusClass(x){if(x.status==='paid')return'green';if(x.status==='open'&&x.due&&x.due<referenceDate())return'red';return x.status==='planned'?'muted':'yellow'}
+function renderExpenses(){
+ let a=expenses.map((x,i)=>({...x,_i:i})).filter(inYear).reverse(),term=$('#search').value.toLowerCase();
+ if(term)a=a.filter(x=>(`${x.desc} ${x.invoice||''} ${x.cat} ${x.note||''}`).toLowerCase().includes(term));
+ if(['planned','open','paid'].includes(filter))a=a.filter(x=>x.status===filter);
+ if(filter==='overdue')a=a.filter(x=>x.status==='open'&&x.due&&x.due<referenceDate());
+ if(filter==='due')a=a.filter(x=>x.status==='open'&&x.due&&x.due>=referenceDate());
+ if(filter==='20')a=a.slice(0,20);
+ $('#expenseList').innerHTML=a.length?a.map(x=>{let diff=(+x.amount||0)-(+x.planAmount||+x.amount||0);return `<div class="row"><div><b>${esc(x.desc)}</b><div class="muted">${x.date} · ${esc(x.cat)}${x.skr?' · SKR03 '+esc(skrLabel(x.skr)):''} · Nr. ${esc(x.invoice||'—')}${x.note?'<br>'+esc(x.note):''}</div></div><div class="right"><b>${euro(x.amount)}</b>${x.planAmount&&Math.abs(diff)>.009?`<div class="${diff>0?'red':'green'}">Plan ${euro(x.planAmount)} · Abw. ${euro(diff)}</div>`:''}<div class="${expenseStatusClass(x)}">${statusName(x.status)}${x.due?' · '+x.due:''}</div><div class="actions"><button onclick="editExpense(${x._i})">Bearbeiten</button><button onclick="duplicateExpense(${x._i})">Duplizieren</button><button class="danger" onclick="deleteExpense(${x._i})">Löschen</button></div></div></div>`}).join(''):'<span class="muted">Keine passenden Ausgaben.</span>'
+}
+function renderBudgets(){$('#budgetInputs').innerHTML=Object.entries(cats).map(([c,b])=>`<label>${esc(c)}<input class="budgetEdit" data-cat="${esc(c)}" type="number" min="0" step="100" value="${b}"></label>`).join('');document.querySelectorAll('.budgetEdit').forEach(x=>x.onchange=()=>{cats[x.dataset.cat]=+x.value||0;persist();render()})}
+function latestMonth(){
+ let ds=[...incomes.filter(inYear).map(x=>x.date),...expenses.filter(inYear).map(x=>x.date)].filter(Boolean).sort();return ds.length?Math.max(1,+ds.at(-1).slice(5,7)):1
+}
+function render(){
+ $('#incomeYearLabel').textContent=$('#expenseYearLabel').textContent=$('#analysisYear').textContent=selectedYear;
+ let t=totals(),lim=+$('#limit').value||0,m=latestMonth(),actualExp=expenses.filter(x=>inYear(x)&&x.status!=='planned').reduce((s,x)=>s+(+x.amount||0),0),
+ plannedFuture=expenses.filter(x=>inYear(x)&&x.status==='planned').reduce((s,x)=>s+(+x.amount||0),0),
+ actualInc=incomes.filter(inYear).reduce((s,x)=>s+(+x.amount||0),0),forecastIncome=actualInc*(12/m),forecast=forecastIncome-(actualExp+plannedFuture),res=lim-forecast,totalBudget=Object.values(cats).reduce((a,b)=>a+b,0),sg=sig(t.e,totalBudget);
+ $('#kIncome').textContent=euro(t.i);$('#kExpense').textContent=euro(t.e);$('#kProfit').textContent=euro(t.p);$('#kForecast').textContent=euro(forecast);$('#reserve').textContent=euro(res);
+ $('#expenseSignal').className=sg[1];$('#expenseSignal').textContent=sg[0]+' Budgetstand';
+ $('#limitSignal').className=forecast>lim?'red':forecast>lim*.9?'yellow':'green';$('#limitSignal').textContent=forecast>lim?'🔴 Obergrenze überschritten':forecast>lim*.9?'🟡 Obergrenze nähert sich':'🟢 im Zielkorridor';
+ $('#budgetRows').innerHTML=Object.entries(cats).map(([c,b])=>{let v=spent(c),q=sig(v,b),pct=b?Math.min(100,v/b*100):0;return `<div class="catcard" onclick="openAnalysis('${c.replace(/'/g,"\\'")}')"><div class="row"><span>${q[0]} ${esc(c)}</span><b>${euro(v)} / ${euro(b)}</b></div><div class="progress"><span style="width:${pct}%"></span></div></div>`}).join('');
+ let open=expenses.filter(x=>inYear(x)&&x.status==='open'),planned=expenses.filter(x=>inYear(x)&&x.status==='planned'),over=open.filter(x=>x.due&&x.due<referenceDate()),soon=[...open,...planned].filter(x=>x.due&&x.due>=referenceDate()&&x.due<=addDays(referenceDate(),14));
+ $('#openSummary').innerHTML=`🔴 <b>${over.length}</b> überfällig · 🟡 <b>${open.length}</b> offen · 🔵 <b>${planned.length}</b> geplant · offen/geplant <b>${euro([...open,...planned].reduce((s,x)=>s+(+x.amount||0),0))}</b>`;
+ $('#actionSummary').innerHTML=`<div class="pills"><span class="pill">🔴 ${over.length} überfällig</span><span class="pill">📅 ${soon.length} Zahlungen in 14 Tagen</span><span class="pill">📈 Prognose ${euro(forecast)}</span><span class="pill">🎯 Reserve ${euro(res)}</span></div>`;
+ let yi=incomes.map((x,i)=>({...x,_i:i})).filter(inYear).reverse();
+ $('#incomeList').innerHTML=yi.length?yi.map(x=>`<div class="row"><span>${x.date} · ${esc(x.cat)}${x.customer?' · '+esc(x.customer):''}${x.note?'<br><span class="muted">'+esc(x.note)+'</span>':''}</span><span class="right"><b>${euro(x.amount)}</b><br><button onclick="editIncome(${x._i})">Bearbeiten</button> <button onclick="duplicateIncome(${x._i})">Duplizieren</button> <button class="danger" onclick="deleteIncome(${x._i})">Löschen</button></span></div>`).join(''):`<span class="muted">Für ${selectedYear} sind noch keine Einnahmen erfasst.</span>`;
+ renderExpenses();renderRecurring();renderBudgets();renderAnalysis()
+}
+function addDays(s,n){let d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+function periodBounds(){
+ let p=$('#anaPeriod').value,y=selectedYear;if(p==='year')return[`${y}-01-01`,`${y}-12-31`];
+ if(/^q/.test(p)){let q=+p[1],sm=(q-1)*3+1,em=sm+2,last=new Date(+y,em,0).getDate();return[`${y}-${String(sm).padStart(2,'0')}-01`,`${y}-${String(em).padStart(2,'0')}-${last}`]}
+ if(p==='month'){let m=+$('#anaMonth').value,last=new Date(+y,m,0).getDate();return[`${y}-${String(m).padStart(2,'0')}-01`,`${y}-${String(m).padStart(2,'0')}-${last}`]}
+ return[$('#anaFrom').value||`${y}-01-01`,$('#anaTo').value||`${y}-12-31`]
+}
+function anaExpenses(){let [a,b]=periodBounds();return expenses.filter(x=>x.date>=a&&x.date<=b)}
+function renderAnalysis(){
+ let arr=anaExpenses();$('#analysisCats').innerHTML=Object.keys(cats).map(c=>{let z=arr.filter(x=>x.cat===c),paid=z.filter(x=>x.status==='paid').reduce((s,x)=>s+(+x.amount||0),0),open=z.filter(x=>x.status==='open').reduce((s,x)=>s+(+x.amount||0),0),plan=z.filter(x=>x.status==='planned').reduce((s,x)=>s+(+x.amount||0),0);return `<div class="catcard" onclick="showAnalysisCat('${c.replace(/'/g,"\\'")}')"><div class="row"><b>${esc(c)}</b><span>${euro(paid+open+plan)}</span></div><div class="muted">Bezahlt ${euro(paid)} · Offen ${euro(open)} · Geplant ${euro(plan)}</div></div>`}).join('');
+ if(analysisCat)showAnalysisCat(analysisCat,false)
+}
+window.showAnalysisCat=(c,scroll=true)=>{analysisCat=c;let z=anaExpenses().map((x,i)=>({...x,_idx:expenses.indexOf(x)})).filter(x=>x.cat===c),paid=z.filter(x=>x.status==='paid').reduce((s,x)=>s+(+x.amount||0),0),open=z.filter(x=>x.status==='open').reduce((s,x)=>s+(+x.amount||0),0),plan=z.filter(x=>x.status==='planned').reduce((s,x)=>s+(+x.amount||0),0);
+ let bySkr={};z.forEach(x=>{let k=x.skr||'ohne';bySkr[k]=(bySkr[k]||0)+(+x.amount||0)});let skrSummary=Object.entries(bySkr).map(([k,v])=>`<span class="pill">${k==='ohne'?'ohne SKR03':esc(skrLabel(k))}: ${euro(v)}</span>`).join('');
+ $('#analysisDetail').classList.remove('hidden');$('#analysisDetail').innerHTML=`<h2>${esc(c)}</h2><div class="pills"><span class="pill">Bezahlt ${euro(paid)}</span><span class="pill">Offen ${euro(open)}</span><span class="pill">Geplant ${euro(plan)}</span><span class="pill">Gesamt ${euro(paid+open+plan)}</span></div><h3>SKR03-Aufteilung</h3><div class="pills">${skrSummary||'<span class="muted">keine Buchungen</span>'}</div>${z.length?z.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>`<div class="row"><div><b>${esc(x.desc)}</b><div class="muted">${x.date} · ${statusName(x.status)}${x.skr?' · SKR03 '+esc(skrLabel(x.skr)):''} · Nr. ${esc(x.invoice||'—')}</div></div><div class="right"><b>${euro(x.amount)}</b><br><button onclick="editExpenseFromAnalysis(${x._idx})">Bearbeiten</button></div></div>`).join(''):'<p class="muted">Keine Buchungen im gewählten Zeitraum.</p>'}`;if(scroll)$('#analysisDetail').scrollIntoView({behavior:'smooth'})
+}
+window.openAnalysis=c=>{document.querySelector('[data-tab="analysis"]').click();showAnalysisCat(c)}
+window.editExpenseFromAnalysis=i=>{document.querySelector('[data-tab="expenses"]').click();editExpense(i)}
+function switchTab(id){document.querySelectorAll('.panel').forEach(x=>x.classList.add('hidden'));$('#'+id).classList.remove('hidden');document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===id))}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+
+$('#year').onchange=()=>{selectedYear=$('#year').value;editingIncome=editingExpense=null;clearExpense();cancelIncome();generateRecurring();persist();render()};
+$('#limit').oninput=()=>{persist();render()};$('#validFrom').onchange=persist;$('#search').oninput=renderExpenses;
+
+$('#incomeForm').onsubmit=e=>{e.preventDefault();let a=+$('#inAmount').value;if(a<=0)return;let o={date:$('#inDate').value,customer:$('#inCustomer').value.trim(),cat:$('#inCat').value,amount:a,note:$('#inNote').value.trim()};rememberCustomer(o.customer,o.cat);if(editingIncome===null)incomes.push(o);else incomes[editingIncome]=o;cancelIncome();persist();render()};
+window.editIncome=i=>{let x=incomes[i];editingIncome=i;$('#inDate').value=x.date;$('#inCustomer').value=x.customer||'';$('#inCat').value=x.cat;$('#inAmount').value=x.amount;$('#inNote').value=x.note||'';$('#incomeSave').textContent='Änderungen speichern';$('#incomeCancel').classList.remove('hidden');$('#incomeForm').scrollIntoView({behavior:'smooth'})}
+window.duplicateIncome=i=>{let x=incomes[i];editingIncome=null;$('#inDate').value=isoTodayForYear();$('#inCustomer').value=x.customer||'';$('#inCat').value=x.cat;$('#inAmount').value=x.amount;$('#inNote').value=x.note||'';$('#incomeForm').scrollIntoView({behavior:'smooth'})}
+window.deleteIncome=i=>{if(confirm('Diese Einnahme wirklich löschen?')){incomes.splice(i,1);persist();render()}}
+function cancelIncome(){editingIncome=null;$('#inDate').value=isoTodayForYear();$('#inCustomer').value='';$('#inAmount').value='';$('#inNote').value='';$('#incomeSave').textContent='+ Einnahme speichern';$('#incomeCancel').classList.add('hidden')}$('#incomeCancel').onclick=cancelIncome;
+
+function invoiceDuplicate(inv){return inv&&expenses.some((x,i)=>i!==editingExpense&&x.invoice&&x.invoice.toLowerCase()===inv.toLowerCase())}
+function recurringUI(){let on=$('#exRecurring').checked;['#rhythmWrap','#validFromWrap','#validToWrap','#amountModeWrap'].forEach(id=>$(id).classList.toggle('hidden',!on));$('#customDatesWrap').classList.toggle('hidden',!(on&&$('#exRhythm').value==='custom'))}
+$('#exRecurring').onchange=recurringUI;$('#exRhythm').onchange=recurringUI;
+$('#exDesc').oninput=()=>{let g=categoryGuess($('#exDesc').value);if(g){$('#exCat').value=g;fillSkrSelect('#exSkr',g,skrGuess($('#exDesc').value,g))}else{let s=skrGuess($('#exDesc').value,$('#exCat').value);if(s)$('#exSkr').value=s}};
+$('#exDesc').onchange=()=>{let s=suppliers.find(x=>x.name.toLowerCase()===$('#exDesc').value.trim().toLowerCase());if(s){$('#exCat').value=s.cat;$('#exPay').value=s.pay||'Bank';fillSkrSelect('#exSkr',s.cat,learnedSkr[s.name]||skrGuess(s.name,s.cat))}else{let g=categoryGuess($('#exDesc').value);if(g){$('#exCat').value=g;fillSkrSelect('#exSkr',g,skrGuess($('#exDesc').value,g))}}};
+$('#inCustomer').onchange=()=>{let s=customers.find(x=>x.name.toLowerCase()===$('#inCustomer').value.trim().toLowerCase());if(s)$('#inCat').value=s.cat};
+
+$('#exCat').onchange=()=>fillSkrSelect('#exSkr',$('#exCat').value,skrGuess($('#exDesc').value,$('#exCat').value));
+$('#exSkr').onchange=()=>{let d=$('#exDesc').value.trim();if(d&&$('#exSkr').value){learnedSkr[d]=$('#exSkr').value;persist()}};
+$('#rCat').onchange=()=>fillSkrSelect('#rSkr',$('#rCat').value,skrGuess($('#rDesc').value,$('#rCat').value));
+
+$('#exInvoice').oninput=()=>$('#dup').classList.toggle('hidden',!invoiceDuplicate($('#exInvoice').value.trim()));
+
+$('#expenseForm').onsubmit=e=>{e.preventDefault();let inv=$('#exInvoice').value.trim(),a=+$('#exAmount').value;if(invoiceDuplicate(inv))return $('#dup').classList.remove('hidden');if(a<=0)return;
+ let o={date:$('#exDate').value,desc:$('#exDesc').value.trim(),invoice:inv,cat:$('#exCat').value,skr:$('#exSkr').value,planAmount:+$('#exPlan').value||a,amount:a,due:$('#exDue').value,status:$('#exStatus').value,pay:$('#exPay').value,one:$('#exOne').checked,note:$('#exNote').value.trim()};
+ rememberSupplier(o.desc,o.cat,o.pay);if(o.desc&&o.skr)learnedSkr[o.desc]=o.skr;
+ if($('#exRecurring').checked&&editingExpense===null){let custom=$('#exCustomDates').value.split(',').map(parseGermanDate).filter(Boolean);recurring.push({id:Date.now(),desc:o.desc,cat:o.cat,skr:o.skr,pay:o.pay,validFrom:$('#exValidFrom').value||o.date,validTo:$('#exValidTo').value||`${selectedYear}-12-31`,rhythm:$('#exRhythm').value,amountMode:$('#exAmountMode').value,amount:a,firstDue:o.due||o.date,customDates:custom,note:o.note,active:true})}
+ if(editingExpense===null)expenses.push(o);else{let old=expenses[editingExpense];expenses[editingExpense]={...old,...o}}
+ clearExpense();generateRecurring();persist();render()
+};
+window.editExpense=i=>{let x=expenses[i];editingExpense=i;$('#exDate').value=x.date;$('#exDesc').value=x.desc;$('#exInvoice').value=x.invoice||'';$('#exCat').value=x.cat;fillSkrSelect('#exSkr',x.cat,x.skr||skrGuess(x.desc,x.cat));$('#exPlan').value=x.planAmount||x.amount;$('#exAmount').value=x.amount;$('#exDue').value=x.due||'';$('#exStatus').value=x.status||'open';$('#exPay').value=x.pay||'Bank';$('#exOne').checked=!!x.one;$('#exNote').value=x.note||'';$('#exRecurring').checked=false;recurringUI();$('#expenseSave').textContent='Änderungen speichern';$('#expenseCancel').classList.remove('hidden');$('#expenseForm').scrollIntoView({behavior:'smooth'})}
+window.duplicateExpense=i=>{let x=expenses[i];editingExpense=null;$('#exDate').value=isoTodayForYear();$('#exDesc').value=x.desc;$('#exInvoice').value='';$('#exCat').value=x.cat;fillSkrSelect('#exSkr',x.cat,x.skr||skrGuess(x.desc,x.cat));$('#exPlan').value=x.planAmount||x.amount;$('#exAmount').value=x.amount;$('#exDue').value='';$('#exStatus').value='open';$('#exPay').value=x.pay||'Bank';$('#exOne').checked=!!x.one;$('#exNote').value=x.note||'';$('#expenseForm').scrollIntoView({behavior:'smooth'})}
+window.deleteExpense=i=>{if(confirm('Diese Ausgabe wirklich löschen?')){expenses.splice(i,1);persist();render()}}
+function clearExpense(){editingExpense=null;['#exDesc','#exInvoice','#exPlan','#exAmount','#exDue','#exCustomDates','#exNote'].forEach(id=>$(id).value='');$('#exDate').value=isoTodayForYear();fillSkrSelect('#exSkr',$('#exCat').value);$('#exStatus').value='open';$('#exPay').value='Bank';$('#exOne').checked=$('#exRecurring').checked=false;$('#exValidFrom').value=`${selectedYear}-01-01`;$('#exValidTo').value=`${selectedYear}-12-31`;recurringUI();$('#dup').classList.add('hidden');$('#expenseSave').textContent='Speichern';$('#expenseCancel').classList.add('hidden')}
+$('#clear').onclick=$('#expenseCancel').onclick=clearExpense;
+document.querySelectorAll('.filter').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x===b));renderExpenses()});
+
+window.editRecurring=i=>{editingRecurring=i;let r=recurring[i];$('#recEditCard').classList.remove('hidden');$('#recEditTitle').textContent='Wiederkehrende Ausgabe bearbeiten';fillRecForm(r);$('#recEditCard').scrollIntoView({behavior:'smooth'})}
+window.newPeriod=i=>{editingRecurring=null;let r=recurring[i],ny=String(Math.max(+selectedYear,+String(r.validTo||selectedYear).slice(0,4)+1));$('#recEditCard').classList.remove('hidden');$('#recEditTitle').textContent='Neue Periode anlegen';fillRecForm({...r,validFrom:`${ny}-01-01`,validTo:`${ny}-12-31`,firstDue:`${ny}-${(r.firstDue||'01-01').slice(5)}`});$('#recEditCard').scrollIntoView({behavior:'smooth'})}
+function fillRecForm(r){$('#rDesc').value=r.desc||'';$('#rCat').value=r.cat;fillSkrSelect('#rSkr',r.cat,r.skr||skrGuess(r.desc,r.cat));$('#rPay').value=r.pay||'Bank';$('#rFrom').value=r.validFrom||'';$('#rTo').value=r.validTo||'';$('#rRhythm').value=r.rhythm||'monthly';$('#rAmountMode').value=r.amountMode||'installment';$('#rAmount').value=r.amount||'';$('#rFirstDue').value=r.firstDue||r.validFrom||'';$('#rCustom').value=(r.customDates||[]).map(d=>d.slice(8,10)+'.'+d.slice(5,7)+'.'+d.slice(0,4)).join(', ');$('#rNote').value=r.note||'';$('#rCustomWrap').classList.toggle('hidden',$('#rRhythm').value!=='custom')}
+$('#rRhythm').onchange=()=>$('#rCustomWrap').classList.toggle('hidden',$('#rRhythm').value!=='custom');
+$('#recForm').onsubmit=e=>{e.preventDefault();let r={id:editingRecurring===null?Date.now():recurring[editingRecurring].id,desc:$('#rDesc').value.trim(),cat:$('#rCat').value,skr:$('#rSkr').value,pay:$('#rPay').value,validFrom:$('#rFrom').value,validTo:$('#rTo').value,rhythm:$('#rRhythm').value,amountMode:$('#rAmountMode').value,amount:+$('#rAmount').value,firstDue:$('#rFirstDue').value,customDates:$('#rCustom').value.split(',').map(parseGermanDate).filter(Boolean),note:$('#rNote').value.trim(),active:editingRecurring===null?true:recurring[editingRecurring].active!==false};if(r.desc&&r.skr)learnedSkr[r.desc]=r.skr;if(editingRecurring===null)recurring.push(r);else recurring[editingRecurring]=r;editingRecurring=null;$('#recEditCard').classList.add('hidden');generateRecurring();persist();render()}
+$('#rCancel').onclick=()=>{$('#recEditCard').classList.add('hidden');editingRecurring=null};
+window.toggleRecurring=i=>{recurring[i].active=recurring[i].active===false;persist();render()}
+window.deleteRecurring=i=>{if(confirm('Vorlage löschen? Bereits erzeugte Buchungen bleiben erhalten.')){recurring.splice(i,1);persist();render()}}
+
+$('#anaMonth').innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">${new Intl.DateTimeFormat('de-DE',{month:'long'}).format(new Date(2027,i,1))}</option>`).join('');
+function anaUI(){let p=$('#anaPeriod').value;$('#anaMonthWrap').classList.toggle('hidden',p!=='month');$('#anaFromWrap').classList.toggle('hidden',p!=='custom');$('#anaToWrap').classList.toggle('hidden',p!=='custom');analysisCat=null;$('#analysisDetail').classList.add('hidden');renderAnalysis()}
+['#anaPeriod','#anaMonth','#anaFrom','#anaTo'].forEach(id=>$(id).onchange=anaUI);
+
+$('#exportBtn').onclick=()=>{persist();let blob=new Blob([localStorage.getItem(STORE)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`EP-TAXEN_V6_Datensicherung_${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)}
+$('#importFile').onchange=e=>{let f=e.target.files[0];if(!f)return;let rd=new FileReader();rd.onload=()=>{try{let d=JSON.parse(rd.result);if(!confirm('Datensicherung einlesen und aktuelle Daten ersetzen?'))return;localStorage.setItem(STORE,JSON.stringify(d));location.reload()}catch(err){alert('Die Datei konnte nicht eingelesen werden.')}};rd.readAsText(f)};
+
+fillCatSelects();clearExpense();cancelIncome();generateRecurring();render();
+</script></body></html>
